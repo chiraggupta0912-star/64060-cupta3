@@ -1,0 +1,20 @@
+# Healthcare Dataset Analysis (R)
+
+This repository contains an R script and dataset for healthcare data analysis.
+
+## Contents
+- `healthcare_analysis.R`: R program with descriptive statistics, transformation, and plots.
+- `healthcare_dataset.csv`: Sample dataset used in the analysis.
+
+## Tasks Completed
+1. Descriptive statistics for quantitative (Age, Billing Amount) and categorical variables.
+2. Transformation (log of Billing Amount).
+3. Plots:
+   - Histogram of Age
+   - Scatterplot of Age vs Billing Amount
+
+## How to Run
+1. Download both files.
+2. Open `healthcare_analysis.R` in RStudio.
+3. Update the path to `healthcare_dataset.csv` if necessary.
+4. Run the script.
