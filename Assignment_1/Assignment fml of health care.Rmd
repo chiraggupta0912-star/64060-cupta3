@@ -1,0 +1,51 @@
+---
+title: "care"
+author: "Chirag gupta"
+date: "2025-09-09"
+output: html_document
+---
+
+```{r}
+# Load CSV (adjust path if needed)
+healthcare <- read.csv("C:/Users/devil/Downloads/archive (1)/healthcare_dataset.csv")
+```
+
+```{r}
+# Check structure
+class(healthcare)      # should be "data.frame"
+str(healthcare)        # shows columns and types
+```
+
+
+##Quantitative descriptive statistics
+summary(healthcare$Age)
+summary(healthcare$Billing.Amount)```{r}
+names(healthcare)      # shows column names
+```
+```{r}
+##Categorical statistics 
+table(healthcare$Gender)
+table(healthcare$Blood.Type)
+table(healthcare$Medical.Condition)
+table(healthcare$Insurance.Provider)
+```
+```{r}
+##Transformation
+healthcare$Log_Billing_Amount <- log(pmax(healthcare$Billing.Amount, 1))
+```
+```{r}
+##Plots
+##Histogram of Age
+hist(healthcare$Age, breaks = 30, col = "lightblue",
+     main = "Distribution of Patient Age",
+     xlab = "Age", ylab = "Frequency")
+```{r}
+##Scatterplot Age vs Billing Amount
+plot(healthcare$Age, healthcare$Billing.Amount,
+     main = "Scatterplot of Age vs Billing Amount",
+     xlab = "Age", ylab = "Billing Amount",
+     col = "blue", pch = 16)
+```
+
+```
+
