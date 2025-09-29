@@ -1,0 +1,267 @@
+---
+title: "Assignment 2 -fml"
+author: "Chirag gupta"
+date: "2025-09-26"
+output: html_document
+---
+
+```{r}
+## Loading necessary libraries 
+library(caret) #For Knn Classification
+library(class) #For data preprocessing 
+library(readr) #to read csv file
+```
+
+
+
+```{r}
+# QUESTION 1- Importing and Preparing universal bank data set
+bank <- read_csv("C:/Users/devil/Downloads/UniversalBank.csv")
+summary(bank) # To check the overall summary and get an insight
+str(bank)  # To check that what are the class of our data set(which is numerical or categorical or anything else.)
+```
+```{r}
+#removing unwanted variable id, zipcode
+new_bank<-bank[, -c(1,5)]
+new_bank
+
+```
+```{r}
+#Converting variable(EDUCATION)
+new_bank$Education <- as.factor(new_bank$Education)
+str(new_bank)
+names(new_bank$Education)
+```
+
+
+```{r}
+#Conevrting categorical variable into dummy variable and getting a new data set
+dummy_education <- dummyVars(~., data =new_bank)
+new_bank <- as.data.frame(predict(dummy_education, new_bank))
+head(new_bank)
+```
+```{r}
+#removing the backtick from personal loan
+names(new_bank) <- make.names(names(new_bank))
+#removing x from them
+clean_names <- function(names_vec) {
+  names_vec <- gsub("^X\\.", "", names_vec)   # Remove leading 'X.'
+  names_vec <- gsub("\\.$", "", names_vec)    # Remove trailing '.'
+  return(names_vec)
+}
+names(new_bank) <- clean_names(names(new_bank))
+colnames(new_bank)
+
+
+```
+
+```{r}
+##Answer 1: Splitting Dataset into Training, Validation Sets
+set.seed(123)
+train_Index <- createDataPartition(new_bank$Personal.Loan, p=0.6, list=FALSE)
+Train <- new_bank[train_Index,]
+validation <- new_bank[-train_Index,]
+#excluding target variable personal loan from it
+train_predictor <-Train[,-10]
+validation_predicator <- validation[,-10]
+colnames(train_predictor)
+```
+```{r}
+#Normalizing the train and validation
+new_bank_normalized <-preProcess(Train[,-10], method=c("center", "scale"))
+train_label <-predict(new_bank_normalized,Train[,-10])
+validation_label <-predict(new_bank_normalized,validation[,-10])
+```
+Interpretation
+The universal bank dataset, is divided into two sections in the section above:60% for training, 40% for validation, and later removed the target variable(personal loan) and then normalized the data.
+
+```{r}
+#ANSWER 2- k-NN Classification
+#Adding a new customer
+new_customer_record <- data.frame(
+  Age = 40,
+  Experience = 10,
+  Income = 84,
+  Family = 2,
+  CCAvg = 2,
+  Education.1 = 0,
+  Education.2 = 1,
+  Education.3 = 0,
+  Mortgage = 0,
+  Securities.Account = 0,
+  CD.Account = 0,
+  Online = 1,
+  CreditCard = 1
+)
+#Normalizing new data
+names(new_bank_normalized)
+new_customer <-new_customer_record
+new_customer <-predict(new_bank_normalized, new_customer_record)
+
+```
+Interpretation
+In the above section, a data frame for the new sample dataset is created using the specified variable values, and the data frame is normalized using the same normalization parameters as the bank dataset.
+
+```{r}
+#Determining the Optimal k Value
+# Running k-NN classification with k = 1 for the new customer record
+knn.prediction1 <- class::knn(train = train_label, 
+                       test = new_customer, 
+                       cl = Train$Personal.Loan, k = 1)
+knn.prediction1
+```
+Interpretation
+The k-NN model classified the new customer entry as 0,meaning that the new customer will not accept the loan
+```{r}
+# ANSWER-3 Finding the value of k that balance between underfitting and over fitting 
+accuracy_data <- data.frame(k = seq(1, 15, 1), overallaccuracy = rep(0, 15))
+for (i in 1:15) {
+  knn.pred<-class::knn(train=train_label,
+                       test=validation_label,
+                       cl=Train$Personal.Loan, k=i)
+  
+  accuracy_data[i,2]<-confusionMatrix(knn.pred,as.factor(validation$Personal.Loan),positive ="1")$overall[1]
+  
+}
+which(accuracy_data[,2]==max(accuracy_data[,2]))
+```
+Interpretation :
+The k-NN model was evaluated for k. loop for K values between 1 and 15 are used to determine the appropriate balance of overfitting to underfitting. which returned k=1 which means the maximum overall accuracy attained at k=1.
+
+```{r}
+# Plotting accuracy results against k values
+plot(accuracy_data$k,accuracy_data$overallaccuracy)
+
+```
+```{r}
+# STEP 4: Confusion matrix for validation set using best k
+best_k <- 1   # from above loop
+knn.pred.best <- class::knn(train = train_label,
+                            test = validation_label,
+                            cl = Train$Personal.Loan,
+                            k = best_k)
+
+conf_matrix <- confusionMatrix(knn.pred.best,
+                               as.factor(validation$Personal.Loan),
+                               positive = "1")
+conf_matrix
+```
+INTERPERTATION 
+This gives accuracy, sensitivity, specificity, and the full confusion matrix for the validation data at best k.
+
+Sensitivity = ability to correctly predict loan acceptance (class 1).
+
+Specificity = ability to correctly predict non-acceptance (class 0)
+```{r}
+# STEP 5: Classifying the new customer with best k
+new_customer_pred <- class::knn(train = train_label,
+                                test = new_customer,
+                                cl = Train$Personal.Loan,
+                                k = best_k)
+new_customer_pred
+```
+Interpretation:
+The output is 0 which means that the new customer has not accepted the loan. 
+```{r}
+#ANSWER- REPARTATION OF DATASET 
+# STEP 6: Repartition into Train:Validation:Test (50:30:20)
+set.seed(123)
+train_index2 <- createDataPartition(new_bank$Personal.Loan, p = 0.5, list = FALSE)
+Train2 <- new_bank[train_index2, ]
+temp <- new_bank[-train_index2, ]
+
+# split temp into validation (30%) and test (20%)
+val_index <- createDataPartition(temp$Personal.Loan, p = 0.6, list = FALSE)
+Validation2 <- temp[val_index, ]
+Test2 <- temp[-val_index, ]
+
+# prepare predictors (exclude target var)
+train_pred2 <- Train2[, -10]
+val_pred2   <- Validation2[, -10]
+test_pred2  <- Test2[, -10]
+
+# normalize with training
+norm2 <- preProcess(train_pred2, method = c("center", "scale"))
+train_norm2 <- predict(norm2, train_pred2)
+val_norm2   <- predict(norm2, val_pred2)
+test_norm2  <- predict(norm2, test_pred2)
+```
+```{r}
+#NOW RUNNING WITH BEST VALUE OF K 
+# Training prediction
+train_knn <- class::knn(train = train_norm2,
+                        test = train_norm2,
+                        cl = Train2$Personal.Loan,
+                        k = best_k)
+
+train_conf <- confusionMatrix(train_knn, as.factor(Train2$Personal.Loan), positive = "1")
+train_conf
+
+# Validation prediction
+val_knn <- class::knn(train = train_norm2,
+                      test = val_norm2,
+                      cl = Train2$Personal.Loan,
+                      k = best_k)
+
+val_conf <- confusionMatrix(val_knn, as.factor(Validation2$Personal.Loan), positive = "1")
+val_conf
+
+# Test prediction
+test_knn <- class::knn(train = train_norm2,
+                       test = test_norm2,
+                       cl = Train2$Personal.Loan,
+                       k = best_k)
+
+test_conf <- confusionMatrix(test_knn, as.factor(Test2$Personal.Loan), positive = "1")
+test_conf
+```
+
+
+INTERPERATION 
+training Set:
+TN (True Negatives) = 2271
+FP (False Positives) = 0
+FN (False Negatives) = 0
+TP (True Positives) = 229
+Accuracy = (TP + TN) / (TP+TN+FP+FN)
+= (229 + 2271) / (229 + 2271 + 0 + 0) = 1.000 (100%)
+
+Sensitivity = TP / (TP+FN) = 229 / (229+0) = 1.0000 (100%)
+Specificity = TN / (TN+FP) = 2271 / (2271+0) = 1.0000 (100%)
+
+The training model is perfectly fitting the training set. This is expected with k=1, but it may indicate overfitting since real-world data won’t be classified this perfectly. 
+
+validation set:
+TN = 1335
+FP = 22
+FN = 42
+TP = 101
+Accuracy = (101+1335) / (101+1335+22+42) = 1436 / 1500 = 0.9573 (95.73%)
+accuracy drops slightly to 95.7%.
+
+Sensitivity = 101 / (101+42) = 0.706 (70.63%)
+Specificity = 1335 / (1335+22) = 0.9838 (98.38%)
+
+The model is very strong at identifying non-loan customers (specificity ~98%).
+
+However, it struggles more to detect loan acceptances (sensitivity ~71%), meaning it misses about 3 out of 10 actual positives.
+
+test set:
+TN = 885
+FP = 7
+FN = 29
+TP = 79
+Accuracy = (79+885) / (79+885+7+29) = 964 / 1000 = 0.964 (96.4%)
+
+Sensitivity = 79 / (79+29) = 0.7315 (73.15%)
+Specificity = 885 / (885+7) = 0.9922 (99.22%)
+
+The model achieves 96.4% accuracy.
+
+Again, specificity is very high (99.2%), so the model is excellent at ruling out non-loan customers.
+
+Sensitivity is 73.1%, which means it correctly identifies about 3 out of 4 loan customers but still misses some.
+  
+
+```
+
