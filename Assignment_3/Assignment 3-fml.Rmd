@@ -1,0 +1,229 @@
+---
+title: "assignment 3 -fml"
+author: "Chirag gupta"
+date: "2025-10-08"
+output: html_document
+---
+```{r}
+library(e1071)    # for naiveBayes
+library(reshape2) # for melt and cast
+library(dplyr)    # for data wrangling
+library(caret)    #for classification
+library(readr)    #to read csv file
+```
+
+```{r}
+#reading csv file
+orignal_bank <- read_csv("C:/Users/devil/Downloads/UniversalBank (2).csv")
+View(orignal_bank)
+names(orignal_bank)
+```
+```{r}
+#keeping the required coloums as asked 
+bank <- orignal_bank[, c("Online", "CreditCard", "Personal Loan")]
+set.seed(123)
+```
+```{r}
+colnames(bank) <- c("Online", "CC", "Loan") #remaining the coloum names
+head(bank)
+```
+```{r}
+#converting variables in factor
+bank$Online <-as.factor(bank$Online)
+bank$CC <- as.factor(bank$CC)
+bank$Loan <- as.factor(bank$Loan)
+```
+
+```{r}
+#partitoning the dataset in 60 percent train and remaining in valid 
+train_index <- createDataPartition(bank$Loan, p = 0.6, list = FALSE)
+
+train <- bank[train_index, ]
+valid <- bank[-train_index, ]
+
+# Check dimensions of training set
+dim(train)
+
+# Check dimensions of validation set
+dim(valid)
+```
+```{r}
+#Answer-1
+pivot_table <- with(train, table(CC, Online,Loan))
+print(pivot_table)
+ft <- ftable(train$CC, train$Loan, train$Online)
+ft
+
+```
+
+ALTERNATIVELY FOR A BETTER UNDERSTANDING 
+
+```{r}
+melt <- melt(train, id.vars = c("CC", "Online", "Loan"))
+cast_table <- dcast(melt, CC + Loan ~ Online, length) 
+print(cast_table)
+```
+
+
+INTERPRETATION - 
+
+In the above code i have used both the functions for a clearer view of our data where cc and loan are used as row and online as coloumn, wherein the values 0 in online shows how many have not taken the cc and loan and 1 represent vice verse
+```{r}
+#Answer-2 Find probability of Loan = 1 given CC = 1 and Online = 1
+
+# We will filter training data for customers with CC=1 and Online=1
+subset_data <- train %>%
+  filter(CC == 1, Online == 1)
+
+# Calculate probability of loan acceptance in this group
+prob <- sum(subset_data$Loan == 1) / nrow(subset_data)
+
+cat("P(Loan = 1 | CC = 1, Online = 1) from data (pivot table) =", prob, "\n") # concatinating and printing at same time.
+```
+INTERPRETATION - 
+
+In the above code it shows the  probability that a customer who owns a credit card and uses online banking accepts the loan.  IN other words- if we pick a customer who uses the bank’s credit card and online banking services, there is approximately a 9.85% chance that they will accept a personal loan
+h
+```{r}
+#Answer-3 
+#Creating two tables for training data
+#Table 1: Relationship between Loan and Online
+# Create the table
+table_loan_online <- table(train$Loan, train$Online)
+
+# Add row and column names
+colnames(table_loan_online) <- c("Online = 0", "Online = 1")
+rownames(table_loan_online) <- c("Loan = 0", "Loan = 1")
+
+# Print nicely
+print(table_loan_online)
+
+```
+
+
+```{r}
+# Create the table
+table_loan_cc <- table(train$Loan, train$CC)
+
+# Add readable row and column names
+rownames(table_loan_cc) <- c("Loan = 0", "Loan = 1")
+colnames(table_loan_cc) <- c("CC = 0", "CC = 1")
+
+# Print the formatted table
+print(table_loan_cc)
+
+
+```
+INTERPRETATION- 
+
+Int his step we are creating 2 tables - one by using loan and online and the other by using loan and cc where loan has been taken as rows in both of the tables 
+
+
+```{r}
+# Answer-4 Computing the probablites as asked 
+# P(CC = 1 | Loan = 1)
+P_CC1_L1 <- sum(train$CC == 1 & train$Loan == 1) / sum(train$Loan == 1)
+
+# P(Online = 1 | Loan = 1)
+P_Online1_L1 <- sum(train$Online == 1 & train$Loan == 1) / sum(train$Loan == 1)
+
+# P(Loan = 1)
+P_L1 <- mean(train$Loan == 1)
+
+# P(CC = 1 | Loan = 0)
+P_CC1_L0 <- sum(train$CC == 1 & train$Loan == 0) / sum(train$Loan == 0)
+
+# P(Online = 1 | Loan = 0)
+P_Online1_L0 <- sum(train$Online == 1 & train$Loan == 0) / sum(train$Loan == 0)
+
+# P(Loan = 0)
+P_L0 <- mean(train$Loan == 0)
+
+# results
+cat("P(CC=1|Loan=1):", P_CC1_L1, "\n")
+cat("P(Online=1|Loan=1):", P_Online1_L1, "\n")
+cat("P(Loan=1):", P_L1, "\n")
+cat("P(CC=1|Loan=0):", P_CC1_L0, "\n")
+cat("P(Online=1|Loan=0):", P_Online1_L0, "\n")
+cat("P(Loan=0):", P_L0, "\n")
+```
+INTERPRETATION- 
+
+In this step we are finding the conditional probablites for credit card holder among loan acceptors with different conditons given where cc, online, loan are 0,1
+
+So when- 
+
+CC=1|Loan=1        probabilty= 0.2916667 
+
+Online=1|Loan=1    probabilty= 0.6111111 
+
+Loan=1             probabilty=0.096 
+
+CC=1|Loan=0        probabilty=0.2865044
+
+Online=1|Loan=0    probabilty=0.5940265 
+
+Loan=0             probabilty=0.904 
+
+```{r}
+#ASNWER- 5 Computing Naive Bayes probability manually
+
+# P(Loan=1 | CC=1, Online=1) = [P(CC=1|Loan=1) * P(Online=1|Loan=1) * P(Loan=1)] /
+#                              ([P(CC=1|Loan=1)*P(Online=1|Loan=1)*P(Loan=1)] + [P(CC=1|Loan=0)*P(Online=1|Loan=0)*P(Loan=0)])
+
+num <- P_CC1_L1 * P_Online1_L1 * P_L1
+den <- num + (P_CC1_L0 * P_Online1_L0 * P_L0)
+P_L1_given_CC1_Online1 <- num / den
+
+cat("Naive Bayes estimated P(Loan = 1 | CC = 1, Online = 1) =", P_L1_given_CC1_Online1, "\n")
+
+```
+
+INTERPRETATION - 
+
+Here we are computing the naive bayes probablity ont he above computed entries and printing the result for loan=1,cc=1,online=1 for comparing it 
+
+
+```{r}
+# Asnwer-6. Comparing the two probabilities
+
+cat("Empirical (from data)  :", prob, "\n")
+cat("Naive Bayes (from model):", P_L1_given_CC1_Online1, "\n")
+```
+INTERPRETATION -
+
+Naive bayes model is more accurate as  we can easily see that the probabilty we we derived from actual data and the probabilty which we derived from naive bayes are quite close but naive bayes model is more accurate since it has been predicted it can be applied to unseen data and the results will be more accurate than the emperical data if applied to unseen data. 
+
+```{r}
+# ANSWER-7 Run Naive Bayes model on data
+
+
+# Train Naive Bayes model using CC and Online to predict Loan
+nb_model <- naiveBayes(Loan ~ CC + Online, data = train,laplace = 1)
+
+c <-predict(nb_model,train, type = "raw")
+head(c)
+```
+
+
+```{r}
+# Predict probability for a new customer with CC=1 and Online=1
+new_customer <- data.frame(CC = factor(1, levels = c(0, 1)),
+                           Online = factor(1, levels = c(0, 1)))
+predicted_prob <- predict(nb_model, new_customer, type = "raw")
+predicted_prob
+```
+INTERPRETATION- 
+
+In this step we are running the naive bayes on the actual data and then compare with the naive bayes probabilty. Upon finding we can actually see that the model has returned the almost same answer in both the cases the slight difference is because of the laplace function otherwise it would have returned the same answer.
+ 
+
+ 
+
+
+ 
+ 
+ 
+ 
+ 
+ 
