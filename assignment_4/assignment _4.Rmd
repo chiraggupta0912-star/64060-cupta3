@@ -1,0 +1,194 @@
+---
+title: "assignment_4"
+author: "Chirag gupta"
+date: "2025-10-17"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(factoextra)
+library(readr)
+library(dplyr)
+set.seed(123)
+library(flexclust)
+```
+```{r}
+Pharmaceuticals <- read_csv("C:/Users/devil/Downloads/Pharmaceuticals.csv")
+View(Pharmaceuticals)
+```
+Interpretation-  In the above we are loading the dataset and having a view 
+
+```{r}
+Pharmaceuticals_new <- Pharmaceuticals[ ,c(3:11)]
+summary(Pharmaceuticals_new)
+str(Pharmaceuticals_new)
+dim(Pharmaceuticals_new)
+```
+INTERPRETATION- Here we are taking variables from 3-11 as mentioned in the question 
+and removing the unwanted one and checking the summary and type of them.
+```{r}
+#normalizing the data
+Pharmaceuticals_new <- scale(Pharmaceuticals_new)
+```
+INTERPRETATION-  Since our dataset has some values which may Skew the data therefore we have normalized the dataset so that every value lies between -3to 3. 
+
+ANSWER-1
+```{r}
+#using elbow method
+fviz_nbclust(Pharmaceuticals_new, kmeans, method = "wss")
+```
+
+```{r}
+
+fviz_nbclust(Pharmaceuticals_new, kmeans, method = "silhouette")
+```
+
+INTERPRETATION- From the above diagram we can conclude that the value of k=5 since it can be clearly seen from the silhoutte method that is why we are choosing silhoutte method of finding as upon looking the elblow method we can see that there are 2-3 values of k which is 5,6 or 4. As silhoutte is specific therefore we have chosen it. 
+
+```{r}
+#Applying k means
+Pharma <- kmeans(Pharmaceuticals_new,centers = 5,nstart = 25)
+```
+```{r}
+#Plotting the graph
+fviz_cluster(Pharma,Pharmaceuticals_new)
+
+```
+Interpretation- As per the demand of the question we have chosen 9 varibales then normalized our dataset. After this we have applied two different method (Elbow and silhoutte method to find the centre and the number of clusters. After applying bith the methids we came to a conclusion that the silhoutte method depicts the actual value which is 5 therefore we have applied it and saw that the number if clusters formed were 5 . )
+
+
+Answer -2 
+```{r}
+#Finding the centres 
+Pharma$center
+```
+INTERPRETATION- In this step we are finding the centriod for the 9 numerical variables as centroids shows the average of the values which is used to have a quick look in dataset. In this 0 shows average performance and positive and negative values shows the above and below performance. 
+
+```{r}
+#finding the size 
+Pharma$size
+```
+```{r}
+#Finding the cluster
+Pharma$cluster
+#finding the sum of squares
+Pharma$withinss
+
+```
+```{r}
+# Add cluster assignments to the original dataset
+Pharmaceuticals$cluster <- Pharma$cluster
+
+# Now calculate averages per cluster
+cluster_averages <- Pharmaceuticals %>%
+  group_by(cluster) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))
+
+# View the results
+print(cluster_averages)
+```
+
+
+```{r}
+#Getting the distance
+distance_Pharmaceuticals_new <- get_dist(Pharmaceuticals_new)
+distance_Pharmaceuticals_new
+fviz_dist(distance_Pharmaceuticals_new)
+
+```
+```{r}
+#finding the firms in each cluster
+Pharmaceuticals$cluster <- Pharma$cluster
+table(Pharmaceuticals$cluster)
+```
+
+ 
+
+INTERPRETATION (ANSWER -2)
+CLUSTER 1 consists of 2 firms which fall under the category of high valuation firms due to its high PE ratio(2.70) and low beta value(.40500) but on the other hand it provides a very negative net profit margin. We can also say that these companies have a very small size sinze the market cap is also low.  Overall we can say that these companies are quite overvalued and may incur huge losses in future.
+
+CLuster 2 has 4 firms which shows a very high revenue growth which means they have an aggressive expansion in short time frame. The PE ratio for these firms is also not too high nor too low which means they are not over or under valued. The profit earning or the profitability is low for these firms in comparison to revenue growth which means these has just stepped in market. Overall we can say these companies may preform good in the future. 
+
+Cluster 3 has 8 firms and are quite efficient and profitable since the have a good (ROE),(ROA) and profit margin. These companies offer a stable return since the beta ratio is not quite low and the debt level is alo quite low which can be seen from the leverage. They dont have a very high or low market cap so they can be put in mid cap firms. Overall these companies are quite good , financially stable and will perform good in future.
+
+Cluster 4 has 3 firms and are marked as debt heavy firms because of the high beta ratio which means they have quite risky stocks and also have a huge debt in them since the leverage is quite high. These companies has quite low or negligible profits because of the (ROE),(ROA),and profit margin.Since the market cap is low they are categorized as small market cap firms. Overall these are quite risky to be stable in future also.
+
+Cluster 5 has 4 firms and can be categorized as the major players since they have a very high market cap and are quite profitable and efficient as they have a good proportion on (ROE),(ROA),asset turnover and profit margin. They have financial stable stocks and are financially disciplined as well beacuse of the low beta and leverage. Overall these can be categorized large cap firms which are quite good and may even preform better in future. 
+ 
+ 
+Answer -3 
+```{r}
+#Finding the relation with remaining three variables
+table(Pharmaceuticals$cluster, Pharmaceuticals$Median_Recommendation) 
+table(Pharmaceuticals$cluster, Pharmaceuticals$Location)
+table(Pharmaceuticals$cluster, Pharmaceuticals$Exchange)
+
+```
+Interpretation-  In this step we have taken the remaining 3 coloumns and comparing with our cluster. On analysing we found that 
+
+In Median Recommendation, cluster 3 has the highest number of firms which out of which the majority are suggesting to hold , whereas cluster 2 is suugesting to buy and sell moderately.
+
+In Location, cluster 3 is dominated by mostly us firms followed by uk and some of switzerland, whereas cluster 2 has mix of france, germany and us.
+
+In Stock exchange, cluster 3 mostly trade on NYSE ,whereas cluster 4 has invested all in AMEX, NASDAQ, NYSE and lastly cluster 5 and 2 have shares in NYSE. 
+
+Overall, there is a clear pattern that the cluster 3 belongs to majority of US based firms who suggest to have buy and hold recomendations indicating better market. 
+
+Asnwer-4 
+
+```{r}
+#Adding the remaining coloumns in cluster and sorting it 
+test <- Pharmaceuticals[order(Pharmaceuticals$cluster), c("Name", "Median_Recommendation","Location","Exchange","cluster")]
+
+```
+
+```{r}
+#Looking for all features for cluster 1 
+cat("=== CLUSTER 1 - ALL FEATURES ===\n")
+cluster1 <- Pharmaceuticals[Pharmaceuticals$cluster == 1, ]
+print(cluster1)
+
+#looking for all features for cluster 2
+cat("=== CLUSTER 2 - ALL FEATURES ===\n")
+cluster2 <- Pharmaceuticals[Pharmaceuticals$cluster == 2, ]
+print(cluster2)
+
+
+#looking for all features for cluster 3
+cat("=== CLUSTER 3 - ALL FEATURES ===\n")
+cluster3 <- Pharmaceuticals[Pharmaceuticals$cluster == 3, ]
+print(cluster3)
+
+
+#looking for all features for cluster 4
+cat("=== CLUSTER 4 - ALL FEATURES ===\n")
+cluster4 <- Pharmaceuticals[Pharmaceuticals$cluster == 4, ]
+print(cluster4)
+
+#looking for all features for cluster 4
+cat("=== CLUSTER 5 - ALL FEATURES ===\n")
+cluster5 <- Pharmaceuticals[Pharmaceuticals$cluster == 5, ]
+print(cluster5)
+
+```
+
+Interpretation- 
+
+Cluster 1 - High-Valuation Company : Cluster 1 companies can be called as high valuation company as the PE_Ratio is quite high which means that the inverstors have high faith in the company and the market value is going to rise up. These company have are situated in Canada and US
+
+
+Cluster 2 - High Growth Firm : In this the companies can be called high growth companies since the revenue growth is quite high for these firms which means the sales for them are quite high. These copmanies have the opinion to sell and buy on moderate scale and are located internationally. 
+
+
+Cluster 3 - Financially strong company : These companies can be called as financially strong as they have a slight high net profit than rest of the companies which means they have operational efficiency and a good cost control. These companies have the majoritly suggest to hold the things and are located in US. 
+
+Cluster 4 - Debt heavy firm : These companies can be categorized as debt heavy firms as the leverage is quite high for them as they have borrowed so much funds and have less revenue as well as less profit margin and still suggesting to hold the stocks.
+
+Cluster 5 - High Scale Firms : These companies can be called as high scale firms since the market cap is quite high which means they are quite dominant in the field with a good asset turnover and profit margin. These companies are mostly located in US and provide the opinio of buy and holding the stocks. 
+ 
+
+
+
+
+
