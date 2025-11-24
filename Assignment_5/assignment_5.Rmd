@@ -1,0 +1,413 @@
+---
+title: "Assignment_5"
+author: "Chirag gupta"
+date: "2025-11-20"
+output: html_document
+---
+```{r}
+library(cluster)
+library(stats)
+library(readr)
+library(tidyverse)
+library(caret)
+library(dplyr)
+library(factoextra)
+```
+
+```{r}
+Cereals_1 <- read_csv("C:/Users/devil/Downloads/Cereals (1).csv")
+head(Cereals_1)
+new_cereals <- na.omit(Cereals_1) #removing the missing values
+
+str(Cereals_1)#finding structure
+
+Cereals_num <- new_cereals %>%
+  select(where(is.numeric)) # for numeric conversion
+```
+
+#### INTERPRETATION:
+Once the dataset has been imported, the data cleaning process is started by excluding all observations with missing values, so that the hierarchical clustering algorithm will only be given observations with complete data inputs, which will not distort the calculations of distances. In addition, the structure of the data set is studied and the numerical variables are extracted for normalization and clustering.
+
+### Question 1
+Apply hierarchical clustering to the data using Euclidean distance to the normalized measurements. Use Agnes to compare the clustering from single linkage, complete linkage, average linkage, and Ward. Choose the best method
+
+```{r}
+#normalizing the data
+Cereals_scaled <- scale(Cereals_num)
+dist_matrix <- dist(Cereals_scaled, method = "euclidean")
+```
+
+#### INTERPRETATION:
+In the case of the numeric variables z-score normalization is often used to normalize the variable around the mean and scale it to unit variance. This is done because hierarchical clustering algorithms operate on distance measures such as the Euclidean distance which are sensitive to variations in scale. Normalization ensures equal weight for all nutritional attributes in forming the clusters.
+
+```{r}
+# Single linkage
+agnes_single <- agnes(Cereals_scaled, method = "single")
+
+# Complete linkage
+agnes_complete <- agnes(Cereals_scaled, method = "complete")
+
+# Average linkage
+agnes_average <- agnes(Cereals_scaled, method = "average")
+
+# Ward linkage
+agnes_ward <- agnes(Cereals_scaled, method = "ward")
+
+```
+#### INTERPRETATION: Running Agnes With Four Linkage Methods
+
+Hierarchical clustering is performed according to four different linkage options to see how each cereal is grouped.
+
+- *Single linkage:* In single linkage clustering, clusters are formed from the closest pair of points, giving rise to chain-like clusters.
+
+- *Comple Linkage:* Complete linkage uses the two most distant points in each cluster, producing compact clusters.
+
+- *Average Linkage:* Average linkage is determined using the mean distance between two clusters and is more balanced.
+
+- *Ward's Method:* Ward's method, which minimizes total within-cluster variance, usually produces compact and tightly bounded clusters.
+
+This makes it possible to compare and determine the best method for modeling this particular dataset.
+
+```{r}
+#Agglomerative coefficients
+
+ac_values <- c(
+single = agnes_single$ac,
+complete = agnes_complete$ac,
+average = agnes_average$ac,
+ward = agnes_ward$ac
+)
+ac_values
+
+```
+#### INTERPRETATION:: Agglomerative Coefficients
+
+The agglomerative coefficient describes the fit of a set of clusters within the data. High values indicate clusters have greater compactness and separation. The method which produces the highest AC is preferred, showing that the groups are most clearly defined within the cereal data.
+
+```{r}
+#plotting the graph 
+
+par(mfrow = c(2,2))
+
+pltree(agnes_single, cex = 0.6, hang = -1, main = "Single Linkage")
+pltree(agnes_complete, cex = 0.6, hang = -1, main = "Complete Linkage")
+pltree(agnes_average, cex = 0.6, hang = -1, main = "Average Linkage")
+pltree(agnes_ward, cex = 0.6, hang = -1, main = "Ward's Method")
+
+par(mfrow = c(1,1))
+
+```
+
+
+#### INTERPRETATION: Dendrogram Comparison
+The dendrograms of these two methods reveal how each algorithm builds the resulting clusters. Single linkage relies heavily on chaining, but complete and average linkage build more compact clusters. Furthermore, Ward's method separates clusters with larger distances between them, as reflected by the high distances at which these agglomerative merges took place. This and the justification of AC values gives their attractiveness.
+
+#### ANSWER-1 [INTERPREATION]:
+Ward’s method produced the cleanest dendrogram, with clusters joining at larger height differences and clearer separation between groups. Based on the AC values and the visual clarity of the dendrogram, Ward’s method is the most suitable clustering approach for this dataset. 
+
+Each linkage method generates a different hierarchical clustering structure, a higher AC indicates more cohesive and well-defined clusters
+
+
+### Question-2
+How many clusters would you choose?
+```{r}
+#Choosing the clusters by looking at the silhouette and eblow method
+
+Cereals_scaled <- as.data.frame(Cereals_scaled)
+fviz_nbclust(Cereals_scaled, kmeans, method = "wss")
+
+
+fviz_nbclust(Cereals_scaled, kmeans, method = "silhouette")
+
+```
+
+#### INTERPRETATION:
+The elbow method (WSS plot) plots cluster compactness versus the number of clusters to identify the point where additional clusters add very little value, yielding a reasonable number of clusters. The foreign object silhouette plot shows how much closer each point is to the rest in its cluster and the rest of the clusters. The best-performing k was found when the average silhouette width was globally maximized. The silhouette method suggested k = 8, which is chosen for further analysis.
+
+### Question-3
+Comment on the structure of the clusters and on their stability. Hint: To check stability, partition the data and see how well clusters formed based on one part apply to the other part. To do this:
+
+##### 1-Cluster partition A: 
+```{r}
+set.seed(123)
+temp <- createDataPartition(1:nrow(Cereals_scaled),p=0.5,list = FALSE)
+A_scaled <- Cereals_scaled[temp, ]
+B_scaled <- Cereals_scaled[-temp, ]
+
+```
+```{r}
+# Dendrogram for Partition A
+
+agnes_parta <- agnes(A_scaled, method = "ward")
+
+par(mfrow = c(1,1))
+par(cex = 1.2)
+
+plot(as.dendrogram(agnes_parta), 
+     main = "Ward Dendrogram - Partition A")
+
+rect.hclust(as.hclust(agnes_parta), k = 8, border = "red")
+
+```
+#### INTERPRETATION:
+To explore structure stability, the entire dataset is shuffled into two partitions of equal size (An and B). The first step is to train on Partition An and create a clustering solution, and the second step is to test the generality of the structure on the unseen data from Partition B.
+
+```{r}
+# Create cluster labels for Partition A using Ward's method
+clusters_A <- cutree(as.hclust(agnes_parta), k = 8)
+
+# (Optional) Check how many cereals fall into each cluster
+table(clusters_A)
+
+```
+
+#### INTERPRETATION:
+Using Ward's method on Partition A with eight clusters (the same number as previously determined through silhouette analysis) gives the baseline cluster configuration used to calculate the centroids, which are then used to assign the observations of Partition B to their correct clusters.
+
+```{r}
+# 2. Compute centroids for partition A
+A_centroids <- aggregate(A_scaled, by = list(grp = clusters_A), FUN = mean)
+A_centroids <- A_centroids[,-1]  # remove cluster label
+```
+
+#### INTERPRETATION:
+The centroids of each of the eight clusters are calculated by taking the mean of each of the standardized nutritional variables for cereals in each cluster. These centroids provide the nutritional profile for each of the eight clusters, which serve as reference points for the cereals assigned to each cluster in Partition B., enabling an objective assessment of cluster stability across data partitions
+
+
+```{r}
+# Combine B data below A centroids
+combined <- rbind(A_centroids, B_scaled)
+
+# Distance matrix
+dist_mat <- as.matrix(dist(combined))
+
+# Only distances from B to the 8 centroids
+dist_BtoC <- dist_mat[-c(1:8), 1:8]
+
+# Assign B rows to nearest centroid
+assign_B <- max.col(-dist_BtoC)
+
+```
+
+#### INTERPRETATION:
+In order to assess this behavior, each cereal in Partition B is compared with each of the cluster centroids found in Partition A, using the Euclidean distance. Each cereal is assigned to the closest cluster centroid, thus allowing to analyze how well the clustering model built on Partition A generalizes.
+
+
+```{r}
+agnes_full <- agnes(Cereals_scaled, method = "ward")
+clusters_full <- cutree(as.hclust(agnes_full), k = 8)
+
+clusters_B_true <- clusters_full[-temp]
+
+table(Predicted = assign_B, True = clusters_B_true)
+
+```
+
+#### INTERPRETATION:
+Here We cluster the full dataset to get the actual cluster labels, then compare them with the labels predicted for Partition B. The table shows how many cereals match, which tells us how stable the clusters are.
+
+The table compares how cereals in Partition B were predicted to be clustered (using the centroids from Partition A) versus their true cluster labels from clustering the full dataset.A high number along a single row-column match means that the cluster assignments are consistent and stable. Here’s what the table tells us:
+- Predicted cluster 3 correctly matched 6 cereals in True cluster 3.
+- Predicted cluster 5 strongly matched True cluster 5 with 10 cereals.
+- Predicted cluster 6 matched True cluster 4 with 4 cereals, showing a stable relationship between those clusters.
+- Predicted cluster 8 correctly matched 3 cereals in True cluster 6
+
+Consistency Between Partition-Based Clustering and Full-Data Clustering:
+
+Cluster centroids derived from Partition A were used to assign each observation in Partition B to its nearest cluster. These predicted cluster assignments were then compared with the original cluster labels obtained using the full dataset
+
+*Cluster 2* exhibited perfect stability (100%), meaning every record belonging to this cluster in the full-data solution was correctly reassigned using only Partition A’s centroids.
+
+*Clusters 3 and 5* demonstrated strong consistency, with accuracies of 75% and 71%, respectively. This indicates that the structure of these clusters is well-preserved even when only half the data is used for training.
+
+*Cluster 6* showed moderate stability (44%), suggesting that its cereals are less clearly separated and more sensitive to variation in the data.
+
+*Cluster 8* had the lowest stability (25%), reflecting that this cluster is small and its cereals are difficult to separate cleanly when using only a subset of the data.
+
+The Ward hierarchical clustering solution is reasonably stable, with several clusters showing high agreement between partition-based assignments and full-data assignments. While a few clusters exhibit lower consistency (particularly smaller or overlapping clusters), the majority of the structure remains intact. This implies that the clustering model is robust enough to generalize to unseen data, supporting the choice of Ward's method with 8 clusters as a suitable segmentation of the cereals dataset.
+
+```{r}
+# Attach cluster labels to cleaned cereal data
+
+new_cereals$Cluster <- factor(clusters_full)
+
+# Compute average nutritional profile for each cluster (centroids in original scale)
+
+cluster_profiles <- new_cereals %>%
+group_by(Cluster) %>%
+summarise(across(where(is.numeric), mean, .names = "avg_{.col}"))
+
+cluster_profiles
+
+```
+#### Interpretation:
+The 8-cluster reveals clear nutritional patterns across clusters.Each cluster groups cereals with similar caloric content, macronutrient composition, and micronutrient density. Below is a structured interpretation for each cluster:
+
+- *Cluster 1* – High-fiber, low-calorie cereals (Healthiest group)
+
+Calories: Very low (63 kcal)
+
+Protein: High relative to calories (4g)
+
+Fiber: Extremely high (11g)
+
+Sugars: Low (3.6g)
+
+Sodium: Moderate
+
+Carbohydrates: Low
+
+Potassium: High (310 mg)
+
+##### Interpretation:
+This is clearly the healthiest cluster. These cereals are high-fiber, low-sugar, low-calorie, and nutrient-dense. Ideal for a school’s “healthy cereals” rotation
+
+
+- *Cluster 2* – Moderate calories, balanced nutrition
+
+Calories: Medium (116 kcal)
+
+Protein: Moderate (3.3g)
+
+Fiber: Low (2.5g)
+
+Sugars: Moderate (7.8g)
+
+Carbohydrates: Medium
+
+Sodium: Moderate (118 mg)
+
+##### Interpretation:
+A mixed-nutrition group with moderate sugar and moderate calories. These cereals are neither particularly healthy nor unhealthy.
+
+- *Cluster 3* – High-sugar cereals (Kids’ cereals cluster)
+
+Calories: ~111 kcal
+
+Protein: Very low (1.5g)
+
+Fiber: Extremely low (0.57g)
+
+Sugars: High (11.28g)
+
+Potassium: Very low
+
+Fat: Low
+
+##### Interpretation:
+This is a clear junk-food cluster. High sugar, almost no fiber, very low protein. These cereals are less suitable for health-focused meal plan
+
+- *Cluster 4* – High-calorie, high-carb cereals
+
+Calories: High (132 kcal)
+
+Sugars: High (10.9g)
+
+Fiber: Moderate (3.6g)
+
+Sodium: High (192 mg)
+
+Potassium: High (172 mg)
+
+##### Interpretation:
+These cereals are high in calories and sugars but have moderate fiber. They appear to be more energy-dense grains or granola-style cereals
+
+
+- *Cluster 5* – High-fiber, moderate-calorie cereals
+
+Calories: ~103 kcal
+
+Fiber: Very high (18.47g)
+
+Sugars: Very low (3.23g)
+
+Sodium: High (227 mg)
+
+##### Interpretation:
+This cluster contains fiber-heavy cereals with low sugar, but sodium is relatively high. Nutritionally better than average but not as ideal as Cluster.
+
+- *Cluster 6* – Very low-sodium cereals
+
+Calories: 91 kcal
+
+Protein: Low
+
+Fiber: Good (2.57g)
+
+Sugars: Very low (3g)
+
+Sodium: Almost zero (2 mg)
+
+##### Interpretation:
+This is a low-sodium, low-sugar group. These cereals are light, simple, minimally processed options. Nutritionally decent.
+
+- *Cluster 7* – Moderate calorie, very high fiber
+
+Calories: 105 kcal
+
+Fiber: Very high (18.5g)
+
+Sugars: Low (3.75g)
+
+Sodium: High (222 mg)
+
+##### Interpretation:
+This is another high-fiber, low-sugar cluster. Similar to Cluster 5 but with more fiber. Good candidate for healthy options, though sodium is again on the higher side.
+
+- *Cluster 8* – Very low-calorie, minimal-nutrient cereals
+
+Calories: Extremely low (50 kcal)
+
+Protein: Very low (1.5g)
+
+Fiber: Very low (0.5g)
+
+Sugars: Zero
+
+Sodium: Zero
+
+Potassium: Zero
+
+##### Interpretation:
+These cereals are basically puffed grains or plain rice-based cereals. Very low calories, but also extremely low nutrient density. Not unhealthy, but not nutrient-rich either. 
+
+Overall:Structure and stability of the clusters
+
+*Structure of the clusters:*
+
+Using Ward's method with 8 clusters, we can separate cereals with high and low nutritional density based on calories, sugars, fiber, protein, etc.
+
+From the cluster centroids, some clusters systematically differ, with several containing higher sugar and calories whereas others (e.g. Cluster 1 and Cluster 7) are both higher in fiber and lower in sugar. Other clusters are generally more balanced in their overall nutrient profile.
+
+This suggests that the clustering solution is capturing meaningful dietary associations rather than simply random groupings in the data.
+
+*Stability of the clusters:*
+
+To assess stability, the data set was split into Partition An and Partition B. The points in Partition A were clustered. The centroids of the clusters in Partition A were then used to assign the points in Partition B to the nearest centroid.
+
+Using the predicted labels from Partition B and the ground truth from the full data, we achieve a stability accuracy of around 66%. There are some clusters such as True clusters 3, 4, 5, 6 which exhibit high stability. A few small clusters contain at most a few points from Partition B.
+
+Overall, the solution appears to be a good one, with the model learned from Partition A doing very well on Partition B, and thus justifying its interpretation in terms of Ward's 8-cluster solution.
+
+
+### Question-4
+The elementary public schools would like to choose a set of cereals to include in their daily cafeterias. Every day a different cereal is offered, but all cereals should support a healthy diet. For this goal, you are requested to find a cluster of “healthy cereals.”Should the data be normalized? If not, how should they be used in the cluster analysis.
+
+
+```{r}
+# Identify healthy cereals: 
+healthy_cluster_id <- 1
+
+healthy_cereals <- new_cereals %>%
+  filter(Cluster == healthy_cluster_id) %>%
+  select(name, calories, protein, fiber, sugars, fat, sodium, potass, rating, Cluster) 
+
+healthy_cereals
+
+```
+#### INTERPRETATION:
+Cereals in the most nutritious cluster (Cluster 1) include 100% Bran, All-Bran, and All-Bran with Extra Fiber which have very high levels of fiber, low sugar, low-calorie, and moderate sodium levels. Cluster 1 cereals may be good choices upon school cafeteria breakfast menus. These menus seek to provide children with a balanced, nutritious breakfast.
+
+For the purpose of "healthy cereals", we used the original variables (amount of calories, sugar, fiber, etc), so that real meaning could be assigned to them in terms of health. The distance measurements were computed on normalized data so that each of the input variables contributes equally to the distance measurement compared to the other input variables. However, when it comes to the healthy cluster the clusters are interpreted using unscaled nutritional data.
+
+Overall- In summary, the data will be normalized so that clustering can be accomplished, but the actual, non-normalized nutritional values will be used to determine the healthiest clusters.
